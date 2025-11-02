@@ -65,9 +65,8 @@ public class ProductRepositoryAdapter implements ProductRepository {
 	public List<Product> findWithFilters(Map<String, Object> filters) {
 		CriteriaBuilder cb = entityManager.getCriteriaBuilder();
 		CriteriaQuery<ProductEntity> query = cb.createQuery(ProductEntity.class);
-		Root<ProductEntity> root = query.from(ProductEntity.class); // "FROM products"
+		Root<ProductEntity> root = query.from(ProductEntity.class);
 
-		// 2. create a list to store the conditions (the WHERE clause)
 		List<Predicate> predicates = new ArrayList<>();
 
 		filters.forEach((field, value) -> {
@@ -87,14 +86,14 @@ public class ProductRepositoryAdapter implements ProductRepository {
 			}
 		});
 
-		// 4. apply WHERE to the query
-		query.where(cb.and(predicates.toArray(new Predicate[0])));
+		// ✅ ARREGLO: Añade esta condición para evitar llamar a .where() con una lista vacía.
+		if (!predicates.isEmpty()) {
+			query.where(cb.and(predicates.toArray(new Predicate[0])));
+		}
 
-		// 5. create and execute the final query
 		TypedQuery<ProductEntity> typedQuery = entityManager.createQuery(query);
 		List<ProductEntity> resultEntities = typedQuery.getResultList();
 
-		// 6. map the results from Entity to Domain and return them
 		return resultEntities.stream()
 				.map(productPersistenceMapper::toDomain)
 				.collect(Collectors.toList());
