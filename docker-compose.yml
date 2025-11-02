@@ -1,0 +1,105 @@
+#version: '3.8'
+services:
+  # Base de datos PostgreSQL
+  db:
+    image: postgres:16-alpine
+    container_name: proyecto-final-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: project
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - proyecto-final-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Aplicación Spring Boot
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: proyecto-final-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/project
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password
+      # JPA
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      # JWT
+      JWT_SECRET: your-super-secret-key-that-should-be-at-least-256-bits-long-for-hs512-algorithm
+      JWT_EXPIRATION: 86400000
+      # Java Options
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - proyecto-final-network
+    volumes:
+      - app_logs:/app/logs
+
+  # pgAdmin (opcional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: proyecto-final-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - proyecto-final-network
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+  # ✅ AÑADIR ESTE SERVICIO PARA SONARQUBE
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: proyecto-final-sonarqube
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    networks:
+      - proyecto-final-network
+
+networks:
+  proyecto-final-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  app_logs:
+    driver: local
+  # ✅ AÑADIR ESTOS VOLÚMENES PARA SONARQUBE
+  sonarqube_data:
+    driver: local
+  sonarqube_logs:
+    driver: local
+  sonarqube_extensions:
+    driver: local
